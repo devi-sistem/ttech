@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vanity Numbers</title>
+</head>
+<body>
+    <h1>Last 5 Callers' Vanity Numbers</h1>
+    <div id="vanity-numbers"></div>
+
+    <script>
+        async function fetchVanityNumbers() {
+            const response = await fetch('API_ENDPOINT');
+            const data = await response.json();
+            const container = document.getElementById('vanity-numbers');
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.textContent = `Caller: ${item.CallerNumber}, Vanity Numbers: ${item.VanityNumbers.join(', ')}`;
+                container.appendChild(div);
+            });
+        }
+
+        fetchVanityNumbers();
+    </script>
+</body>
+</html>

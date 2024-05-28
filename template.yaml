@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Vanity Number Generator Application
+
+Parameters:
+  FrontendBucketName:
+    Type: String
+    Description: Name of the Amazon S3 bucket to store frontend files
+  ApiGatewayName:
+    Type: String
+    Description: Name of the API Gateway
+  StageName:
+    Type: String
+    Description: Name of the API Gateway stage
+
+Resources:
+  VanityNumberLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs18.x
+      CodeUri: .
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref VanityNumberTable
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref VanityNumberTable
+
+  VanityNumberTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: VanityNumbers
+      AttributeDefinitions:
+        - AttributeName: CallerNumber
+          AttributeType: S
+      KeySchema:
+        - AttributeName: CallerNumber
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref FrontendBucketName
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Ref ApiGatewayName
+
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: '{proxy+}'
+
+  ApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: ANY
+      ResourceId: !Ref ApiGatewayResource
+      RestApiId: !Ref ApiGateway
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
+          - LambdaArn: !GetAtt VanityNumberLambda.Arn
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: !Ref StageName
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: !Ref StageName
+      DeploymentId: !Ref ApiGatewayDeployment
+
+Outputs:
+  FrontendURL:
+    Description: URL of the deployed frontend
+    Value: !GetAtt FrontendBucket.WebsiteURL
+  ApiGatewayURL:
+    Description: URL of the deployed API Gateway
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/'
