@@ -25,7 +25,7 @@ Clone the repository:
 
 bash
 Copy code
-git clone https://github.com/your-username/vanity-number-generator.git
+git clone https://github.com/devi-sistem/ttech.git
 Install dependencies:
 
 bash
